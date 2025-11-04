@@ -43,6 +43,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mockStatic;
 
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpTransport;
@@ -75,6 +76,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.MockedStatic;
 
 /** Test case for {@link ComputeEngineCredentials}. */
 @RunWith(JUnit4.class)
@@ -1192,6 +1194,42 @@ public class ComputeEngineCredentialsTest extends BaseSerializationTest {
         exception
             .getMessage()
             .contains("Failed to refresh trust boundary and no cached value is available."));
+  }
+
+  @Test
+  public void refreshAccessToken_withBindCertificateFingerprint() throws IOException {
+    MockMetadataServerTransportFactory transportFactory = new MockMetadataServerTransportFactory();
+    ComputeEngineCredentials credentials =
+        ComputeEngineCredentials.newBuilder().setHttpTransportFactory(transportFactory).build();
+
+    try (MockedStatic<AgentIdentityUtils> mockedUtils = mockStatic(AgentIdentityUtils.class)) {
+      mockedUtils
+          .when(AgentIdentityUtils::getBindCertificateFingerprint)
+          .thenReturn("fake-fingerprint");
+
+      credentials.refreshAccessToken();
+
+      MockLowLevelHttpRequest request = transportFactory.transport.getRequest();
+      String url = request.getUrl();
+      assertTrue(url.contains("bindCertificateFingerprint=fake-fingerprint"));
+    }
+  }
+
+  @Test
+  public void refreshAccessToken_withoutBindCertificateFingerprint() throws IOException {
+    MockMetadataServerTransportFactory transportFactory = new MockMetadataServerTransportFactory();
+    ComputeEngineCredentials credentials =
+        ComputeEngineCredentials.newBuilder().setHttpTransportFactory(transportFactory).build();
+
+    try (MockedStatic<AgentIdentityUtils> mockedUtils = mockStatic(AgentIdentityUtils.class)) {
+      mockedUtils.when(AgentIdentityUtils::getBindCertificateFingerprint).thenReturn(null);
+
+      credentials.refreshAccessToken();
+
+      MockLowLevelHttpRequest request = transportFactory.transport.getRequest();
+      String url = request.getUrl();
+      assertFalse(url.contains("bindCertificateFingerprint"));
+    }
   }
 
   static class MockMetadataServerTransportFactory implements HttpTransportFactory {
