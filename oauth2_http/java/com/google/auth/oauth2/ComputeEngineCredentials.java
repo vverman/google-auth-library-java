@@ -63,6 +63,7 @@ import java.io.ObjectInputStream;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.time.Duration;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -71,6 +72,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -349,8 +351,17 @@ public class ComputeEngineCredentials extends GoogleCredentials
       principal = getDefaultServiceAccount();
     }
 
+    String tokenUrlString = createTokenUrlWithScopes();
+    String fingerprint = AgentIdentityUtils.getBindCertificateFingerprint();
+    if (fingerprint != null) {
+      GenericUrl url = new GenericUrl(tokenUrlString);
+      url.set("bindCertificateFingerprint", fingerprint);
+      tokenUrlString = url.build();
+    }
+
     HttpResponse response =
-        getMetadataResponse(createTokenUrlWithScopes(), RequestType.ACCESS_TOKEN_REQUEST, true);
+        getMetadataResponse(tokenUrlString, RequestType.ACCESS_TOKEN_REQUEST, true);
+
     int statusCode = response.getStatusCode();
     if (statusCode == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
       throw new IOException(

@@ -42,6 +42,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mockStatic;
 
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpTransport;
@@ -69,14 +70,40 @@ import java.util.Queue;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.MockedStatic;
 
 /** Test case for {@link ComputeEngineCredentials}. */
 @RunWith(JUnit4.class)
 public class ComputeEngineCredentialsTest extends BaseSerializationTest {
+
+  @Before
+  public void setUp() {
+    // Unset the env var for most tests to avoid long waits on agent identity check.
+    AgentIdentityUtils.setEnv(
+        new AgentIdentityUtils.Environment() {
+          @Override
+          String get(String name) {
+            if (AgentIdentityUtils.GOOGLE_API_CERTIFICATE_CONFIG.equals(name)) {
+              return null;
+            }
+            return super.get(name);
+          }
+        });
+  }
+
+  @After
+  public void tearDown() {
+    // Restore original env for other test classes
+    AgentIdentityUtils.setEnv(new AgentIdentityUtils.Environment());
+    AgentIdentityUtils.setSleeper(new AgentIdentityUtils.Sleeper());
+    AgentIdentityUtils.setFileIO(new AgentIdentityUtils.FileIO());
+  }
 
   private static final URI CALL_URI = URI.create("http://googleapis.com/testapi/v1/foo");
 
@@ -1144,6 +1171,42 @@ public class ComputeEngineCredentialsTest extends BaseSerializationTest {
         ComputeEngineCredentials.newBuilder().setHttpTransportFactory(transportFactory).build();
     assertThrows(
         GoogleAuthException.class, () -> credentials.idTokenWithAudience("Audience", null));
+  }
+
+  @Test
+  public void refreshAccessToken_withBindCertificateFingerprint() throws IOException {
+    MockMetadataServerTransportFactory transportFactory = new MockMetadataServerTransportFactory();
+    ComputeEngineCredentials credentials =
+        ComputeEngineCredentials.newBuilder().setHttpTransportFactory(transportFactory).build();
+
+    try (MockedStatic<AgentIdentityUtils> mockedUtils = mockStatic(AgentIdentityUtils.class)) {
+      mockedUtils
+          .when(AgentIdentityUtils::getBindCertificateFingerprint)
+          .thenReturn("fake-fingerprint");
+
+      credentials.refreshAccessToken();
+
+      MockLowLevelHttpRequest request = transportFactory.transport.getRequest();
+      String url = request.getUrl();
+      assertTrue(url.contains("bindCertificateFingerprint=fake-fingerprint"));
+    }
+  }
+
+  @Test
+  public void refreshAccessToken_withoutBindCertificateFingerprint() throws IOException {
+    MockMetadataServerTransportFactory transportFactory = new MockMetadataServerTransportFactory();
+    ComputeEngineCredentials credentials =
+        ComputeEngineCredentials.newBuilder().setHttpTransportFactory(transportFactory).build();
+
+    try (MockedStatic<AgentIdentityUtils> mockedUtils = mockStatic(AgentIdentityUtils.class)) {
+      mockedUtils.when(AgentIdentityUtils::getBindCertificateFingerprint).thenReturn(null);
+
+      credentials.refreshAccessToken();
+
+      MockLowLevelHttpRequest request = transportFactory.transport.getRequest();
+      String url = request.getUrl();
+      assertFalse(url.contains("bindCertificateFingerprint"));
+    }
   }
 
   static class MockMetadataServerTransportFactory implements HttpTransportFactory {

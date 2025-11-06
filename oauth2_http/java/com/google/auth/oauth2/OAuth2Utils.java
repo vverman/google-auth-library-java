@@ -80,6 +80,10 @@ import java.util.Set;
  */
 public class OAuth2Utils {
 
+  public static final String GOOGLE_API_CERTIFICATE_CONFIG = "GOOGLE_API_CERTIFICATE_CONFIG";
+  public static final String GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES =
+      "GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES";
+
   static final String SIGNATURE_ALGORITHM = "SHA256withRSA";
 
   public static final String TOKEN_TYPE_ACCESS_TOKEN =
