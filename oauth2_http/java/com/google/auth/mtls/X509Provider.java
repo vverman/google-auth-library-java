@@ -120,7 +120,7 @@ public class X509Provider implements MtlsProvider {
     // Read the certificate and private key file paths into streams.
     try (InputStream certStream = createInputStream(new File(workloadCertConfig.getCertPath()));
         InputStream privateKeyStream =
-            createInputStream(new File(workloadCertConfig.getPrivateKeyPath()));
+            getPrivateKeyStream(new File(workloadCertConfig.getPrivateKeyPath()));
         SequenceInputStream certAndPrivateKeyStream =
             new SequenceInputStream(certStream, privateKeyStream)) {
 
@@ -133,6 +133,50 @@ public class X509Provider implements MtlsProvider {
       // Wrap all other exception types to an IOException.
       throw new IOException("X509Provider: Unexpected IOException:", e);
     }
+  }
+
+  private InputStream getPrivateKeyStream(File privateKeyFile) throws CertificateSourceUnavailableException, IOException {
+    if (!privateKeyFile.exists()) {
+      throw new CertificateSourceUnavailableException("certificate configuration file not found");
+    }
+    byte[] fileBytes = new byte[(int) privateKeyFile.length()];
+    try (FileInputStream fis = new FileInputStream(privateKeyFile)) {
+      fis.read(fileBytes);
+    }
+    String content = new String(fileBytes, "UTF-8");
+    if (content.contains("-----BEGIN RSA PRIVATE KEY-----")) {
+      // Convert PKCS1 to PKCS8 as SecurityUtils.createMtlsKeyStore only supports PKCS8
+      StringBuilder sb = new StringBuilder();
+      for (String line : content.split("\n")) {
+        if (line.contains("BEGIN RSA PRIVATE KEY")) continue;
+        if (line.contains("END RSA PRIVATE KEY")) break;
+        if (!line.trim().isEmpty() && !line.startsWith("#")) {
+          sb.append(line.trim());
+        }
+      }
+      byte[] pkcs1Bytes = com.google.common.io.BaseEncoding.base64().decode(sb.toString());
+      int pkcs1Length = pkcs1Bytes.length;
+      int totalLength = pkcs1Length + 22;
+      byte[] pkcs8Header = new byte[]{
+          0x30, (byte) 0x82, (byte) ((totalLength >> 8) & 0xff), (byte) (totalLength & 0xff),
+          0x02, 0x01, 0x00,
+          0x30, 0x0d, 0x06, 0x09, 0x2a, (byte) 0x86, 0x48, (byte) 0x86, (byte) 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00,
+          0x04, (byte) 0x82, (byte) ((pkcs1Length >> 8) & 0xff), (byte) (pkcs1Length & 0xff)
+      };
+      byte[] pkcs8Bytes = new byte[pkcs8Header.length + pkcs1Bytes.length];
+      System.arraycopy(pkcs8Header, 0, pkcs8Bytes, 0, pkcs8Header.length);
+      System.arraycopy(pkcs1Bytes, 0, pkcs8Bytes, pkcs8Header.length, pkcs1Length);
+      
+      String pkcs8Base64 = com.google.common.io.BaseEncoding.base64().encode(pkcs8Bytes);
+      StringBuilder pem = new StringBuilder();
+      pem.append("-----BEGIN PRIVATE KEY-----\n");
+      for (int i = 0; i < pkcs8Base64.length(); i += 64) {
+        pem.append(pkcs8Base64.substring(i, Math.min(i + 64, pkcs8Base64.length()))).append("\n");
+      }
+      pem.append("-----END PRIVATE KEY-----\n");
+      return new java.io.ByteArrayInputStream(pem.toString().getBytes("UTF-8"));
+    }
+    return new java.io.ByteArrayInputStream(fileBytes);
   }
 
   /**

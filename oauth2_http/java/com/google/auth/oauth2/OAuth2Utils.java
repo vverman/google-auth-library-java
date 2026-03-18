@@ -104,7 +104,7 @@ public class OAuth2Utils {
   public static final HttpTransportFactory HTTP_TRANSPORT_FACTORY =
       new DefaultHttpTransportFactory();
 
-  static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
+  public static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
 
   private static String VALUE_NOT_FOUND_MESSAGE = "%sExpected value %s not found.";
   private static String VALUE_WRONG_TYPE_MESSAGE = "%sExpected %s value %s of wrong type.";
@@ -126,13 +126,13 @@ public class OAuth2Utils {
           "^//iam.googleapis.com/projects/(?<project>[^/]+)/locations/(?<location>[^/]+)/workloadIdentityPools/(?<pool>[^/]+)/providers/(?<provider>[^/]+)$");
 
   static final String IAM_CREDENTIALS_ALLOWED_LOCATIONS_URL_FORMAT_SERVICE_ACCOUNT =
-      "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s/allowedLocations";
-
+      "https://staging-iamcredentials.sandbox.googleapis.com/v1/projects/-/serviceAccounts/%s/allowedLocations";
   static final String IAM_CREDENTIALS_ALLOWED_LOCATIONS_URL_FORMAT_WORKFORCE_POOL =
+      // "https://staging-iamcredentials.sandbox.googleapis.com/v1/locations/global/workforcePools/%s/allowedLocations";
+      // "https://staging-iamcredentials.googleapis.com/v1/locations/global/workforcePools/%s/allowedLocations";
       "https://iamcredentials.googleapis.com/v1/locations/global/workforcePools/%s/allowedLocations";
-
   static final String IAM_CREDENTIALS_ALLOWED_LOCATIONS_URL_FORMAT_WORKLOAD_POOL =
-      "https://iamcredentials.googleapis.com/v1/projects/%s/locations/global/workloadIdentityPools/%s/allowedLocations";
+      "https://staging-iamcredentials.sandbox.googleapis.com/v1/projects/%s/locations/global/workloadIdentityPools/%s/allowedLocations";
 
   // Includes expected server errors from Google token endpoint
   // Other 5xx codes are either not used or retries are unlikely to succeed

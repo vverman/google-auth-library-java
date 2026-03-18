@@ -38,8 +38,7 @@ import java.io.IOException;
  * An interface for providing regional access boundary information. It is used to provide a common
  * interface for credentials that support regional access boundary checks.
  */
-@InternalApi
-interface RegionalAccessBoundaryProvider {
+public interface RegionalAccessBoundaryProvider {
 
   /**
    * Returns the regional access boundary URI.
